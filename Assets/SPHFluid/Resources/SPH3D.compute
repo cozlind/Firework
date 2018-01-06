@@ -1,6 +1,8 @@
 ﻿#pragma kernel DensityCS
 #pragma kernel PressureCS
 #pragma kernel ForceCS
+#pragma kernel ThermalDiffuseCS
+#pragma kernel TypeCS
 #pragma kernel IntegrateCS
 
 // 簡略化のためにスレッド数は1次元にしておく
@@ -10,6 +12,11 @@
 struct Particle {
 	float3 position;
 	float3 velocity;
+};
+
+struct ParticleTemperature {
+	float temperature;
+	float fuel;
 };
 
 struct ParticlePressure {
@@ -22,6 +29,15 @@ struct ParticleForces {
 
 struct ParticleDensity {
 	float density;
+};
+
+struct ParticleType {
+	int type;//0,1,2
+};
+
+struct ParticleThermalDiffuse {
+	float thermalDiffuse;
+	float fuelDiffuse;
 };
 
 // 粒子位置と速度を保持するバッファ
@@ -39,6 +55,22 @@ RWStructuredBuffer<ParticlePressure> _ParticlesPressureBufferWrite;
 // 粒子加速度(力)を保持するバッファ
 StructuredBuffer  <ParticleForces>  _ParticlesForceBufferRead;
 RWStructuredBuffer<ParticleForces>  _ParticlesForceBufferWrite;
+
+// 粒子の温度データを保持するバッファ
+StructuredBuffer<ParticleTemperature>	_ParticlesTemperatureBufferRead;
+RWStructuredBuffer<ParticleTemperature> _ParticlesTemperatureBufferWrite;
+
+// 粒子の初期位置データを保持するバッファ
+StructuredBuffer<Particle>			_ParticlesInitPosBufferRead;
+
+// 粒子の燃焼判定データを保持するバッファ
+StructuredBuffer<ParticleType>		_ParticlesTypeBufferRead;
+RWStructuredBuffer<ParticleType>	_ParticlesTypeBufferWrite;
+
+// 粒子の熱拡散データを保持するバッファ
+StructuredBuffer<ParticleThermalDiffuse>	_ParticleThermalDiffuseRead;
+RWStructuredBuffer<ParticleThermalDiffuse>	_ParticleThermalDiffuseWrite;
+
 // ▲ 構造化バッファの定義 ---------------------
 
 // ▼ シェーダ定数の定義 -----------------------
@@ -52,6 +84,21 @@ cbuffer CB {
 	float _GradPressureCoef;	// 圧力算出時の係数
 	float _LapViscosityCoef;	// 粘性算出時の係数
 	float _WallStiffness;		// ペナルティ法の押し返す力
+	float _FuelConsumeFactor;	//燃料消費係数
+	float _ReactSpeed;			//化学反応速度係数
+	float _TemperatureProduce;	//温度生成係数　(筆者自己定義?) 
+	float _AmbientTemperature;	//環境温度
+	float _Emissivity;			//物質の放射率
+	float _StefanConst;			//ステファン・ボルツマン定数(J/m^3K^4) 
+	float _CopperDiffusivity;	//熱拡散率(銅) 100 * pow(10,-6)
+	float _FuelDiffuse;			//燃料拡散係数
+	float _ParticleMass;		//粒子質量 
+	float _StarRadius;          //星の半径  
+	float _BurnSpeed;			//星の燃焼速度  
+	float _BuoyancyCoef;		//浮力係数 
+	float _ParticleDist;		//粒子の初期間隔
+
+
 	float _Viscosity;			// 粘性係数
 	float3 _Gravity;			// 重力
 	float3 _Range;				// シミュレーション空間
@@ -59,6 +106,7 @@ cbuffer CB {
 	float3 _MousePos;			// マウス位置
 	float _MouseRadius;			// マウスインタラクションの半径
 	bool _MouseDown;			// マウスが押されているか
+	bool _IsFirework;			// 浮力の加算を入れるか
 };
 // ▲ シェーダ定数の定義 -----------------------
 
@@ -197,6 +245,106 @@ void ForceCS(uint3 DTid : SV_DispatchThreadID) {
 	_ParticlesForceBufferWrite[P_ID].acceleration = force / P_density;
 }
 
+// 熱拡散の算出
+//--------------------------------------------------------------------------------------
+[numthreads(THREAD_SIZE_X, 1, 1)]
+void ThermalDiffuseCS(uint3 DTid : SV_DispatchThreadID) {
+	uint P_ID = DTid.x;	// 現在処理しているパーティクルID
+	int  P_type = _ParticlesTypeBufferRead[P_ID].type;
+	if (P_type == 2) return;
+
+
+	float3 P_position = _ParticlesBufferRead[P_ID].position;
+	float  P_density = _ParticlesDensityBufferRead[P_ID].density;
+	float  P_temperature = _ParticlesTemperatureBufferRead[P_ID].temperature;
+	float  P_fuel = _ParticlesTemperatureBufferRead[P_ID].fuel;
+
+	const float h_sq = _Smoothlen * _Smoothlen;
+
+	// 化学反応の計算 (炎粒子の場合のみ)
+
+	float thermalDiffuse = 0; //熱拡散
+	float fuelDiffuse = 0; //燃料拡散
+
+	// 燃料
+	P_fuel += _FuelConsumeFactor*_ReactSpeed*P_fuel*P_temperature;
+	// 温度
+	P_temperature += _TemperatureProduce*_ReactSpeed*P_fuel*P_temperature;
+
+	// 近傍探索(O(n^2))
+	for (uint N_ID = 0; N_ID < _NumParticles; N_ID++) {
+		if (N_ID == P_ID) continue;	// 自身を対象とした場合スキップ
+
+		float3 N_position = _ParticlesBufferRead[N_ID].position;
+		float N_temperature = _ParticlesTemperatureBufferWrite[N_ID].temperature;
+		float N_fuel = _ParticlesTemperatureBufferWrite[N_ID].fuel;
+		float N_density = _ParticlesDensityBufferRead[N_ID].density;
+
+		float3 diff = N_position - P_position;
+		float r_sq = dot(diff, diff);
+
+		// 半径内に収まっていない粒子は除外
+		if (r_sq < h_sq) {
+
+			//熱拡散の計算
+			float td_curr = _CopperDiffusivity*_ParticleMass*_LapViscosityCoef;
+			td_curr *= N_temperature - P_temperature;
+			td_curr *= (h_sq - r_sq) / N_density; //熱拡散項
+			thermalDiffuse += td_curr;
+
+			//燃料拡散の計算
+			float fd_curr = 0.5f*_FuelDiffuse*_ParticleMass*_LapViscosityCoef;//燃料放射(係数部分) ※ベクトル以外
+			fd_curr *= N_temperature + P_temperature;
+			fd_curr *= N_fuel - P_fuel;
+			fd_curr *= (h_sq - r_sq) / N_density;
+			fuelDiffuse += fd_curr;
+		}
+	}
+
+	_ParticleThermalDiffuseWrite[P_ID].thermalDiffuse = thermalDiffuse;
+	_ParticleThermalDiffuseWrite[P_ID].fuelDiffuse = fuelDiffuse;
+}
+
+//粒子の判定(炎 / 星)
+//fireflg = 2 : 星粒子 | fireflg = 1 : 仮想炎粒子 | fireflg = 0 : 炎粒子
+//--------------------------------------------------------------------------------------
+[numthreads(THREAD_SIZE_X, 1, 1)]
+void TypeCS(uint3 DTid : SV_DispatchThreadID) {
+	uint P_ID = DTid.x;	// 現在処理しているパーティクルID
+
+	float3 P_initPos = _ParticlesInitPosBufferRead[P_ID].position;
+	float P_thermalDiffuse = _ParticleThermalDiffuseRead[P_ID].thermalDiffuse;
+	int  P_type = _ParticlesTypeBufferWrite[P_ID].type;
+	float  P_temperature = _ParticlesTemperatureBufferWrite[P_ID].temperature;
+	float  P_fuel = _ParticlesTemperatureBufferWrite[P_ID].fuel;
+
+
+	if (P_type != 2) {
+		// 燃料
+		P_fuel += _FuelConsumeFactor*_ReactSpeed*P_fuel*P_temperature;
+		// 温度
+		P_temperature += _TemperatureProduce*_ReactSpeed*P_fuel*P_temperature;
+		// 熱輻射(放射熱エネルギー)の計算
+		float t = pow(P_temperature, 4) - pow(_AmbientTemperature, 4);
+		float er = _Emissivity*_StefanConst*t;
+		//温度を更新 (炎粒子の場合のみ)
+		P_temperature += P_thermalDiffuse + er;
+	}
+	if (_StarRadius*_StarRadius < dot(P_initPos,P_initPos) && P_type == 1 ){
+		P_type = 0;
+		P_temperature = 2000.0f;
+		P_fuel = 100.0f;
+	}
+	if ((_StarRadius- _ParticleDist)*(_StarRadius- _ParticleDist) < dot(P_initPos,P_initPos) && P_type == 2){
+		P_type = 1;
+		P_temperature = 2000.0f;
+		P_fuel = 100.0f;
+	}
+
+	_ParticlesTypeBufferWrite[P_ID].type = P_type;
+	_ParticlesTemperatureBufferWrite[P_ID].temperature = P_temperature;
+	_ParticlesTemperatureBufferWrite[P_ID].fuel = P_fuel;
+}
 
 //--------------------------------------------------------------------------------------
 // 衝突判定などを行って、位置を更新
@@ -238,8 +386,14 @@ void IntegrateCS(uint3 DTid : SV_DispatchThreadID) {
 	dist = _Range.z - position.z;
 	acceleration += min(dist, 0) * -_WallStiffness * float3(0, 0, -1);
 
+	// 浮力の加算
+	if (_IsFirework) {
+		float3 P_buoyancy = float3(0, _BuoyancyCoef*(_ParticlesTemperatureBufferRead[P_ID].temperature - _AmbientTemperature), 0);
+		acceleration += P_buoyancy;
+	}
 	// 重力の加算
 	acceleration += _Gravity;
+	
 
 	// 前進オイラー法で次の粒子位置を更新
 	velocity += _TimeStep * acceleration;

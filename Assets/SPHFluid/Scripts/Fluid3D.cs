@@ -8,7 +8,7 @@ namespace Kodai.Fluid.SPH {
     };
 
     public class Fluid3D : FluidBase<FluidParticle> {
-        
+
         [SerializeField] private float ballRadius = 0.1f;           // 粒子位置初期化時の円半径
         [SerializeField] private float MouseInteractionRadius = 1f; // マウスインタラクションの範囲の広さ
         

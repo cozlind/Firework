@@ -2,7 +2,9 @@
 	Properties {
 		_MainTex("Texture",         2D) = "black" {}
 		_ParticleRadius("Particle Radius", Float) = 0.05
-		_WaterColor("WaterColor", Color) = (1, 1, 1, 1)
+		_Color1("Color1", Color) = (1, 1, 1, 1)
+		_Color2("Color2", Color) = (1, 1, 1, 1)
+		_Color3("Color3", Color) = (1, 1, 1, 1)
 	}
 
 	CGINCLUDE
@@ -10,7 +12,9 @@
 
 	sampler2D _MainTex;
 	float4 _MainTex_ST;
-	fixed4 _WaterColor;
+	fixed4 _Color1;
+	fixed4 _Color2;
+	fixed4 _Color3;
 
 	float  _ParticleRadius;
 	float4x4 _InvViewMatrix;
@@ -33,6 +37,15 @@
 
 	StructuredBuffer<FluidParticle> _ParticlesBuffer;
 
+
+
+	struct FluidParticleTemperature {
+		float temperature;
+		float fuel;
+	};
+
+	StructuredBuffer<FluidParticleTemperature> _ParticlesTemperatureBuffer;
+
 	// --------------------------------------------------------------------
 	// Vertex Shader
 	// --------------------------------------------------------------------
@@ -40,7 +53,8 @@
 
 		v2g o = (v2g)0;
 		o.pos = float4(_ParticlesBuffer[id].position.xyz,  1);
-		o.color = float4(0, 0.1, 0.1, 1);
+		float t = _ParticlesTemperatureBuffer[id].temperature;
+		o.color = t > 1000 ? _Color1 : (t > 800 ? _Color2 : _Color3);
 		return o;
 	}
 
@@ -81,7 +95,7 @@
 	// Fragment Shader
 	// --------------------------------------------------------------------
 	fixed4 frag(g2f input) : SV_Target {
-		return tex2D(_MainTex, input.tex)*_WaterColor;
+		return tex2D(_MainTex, input.tex)*input.color;
 	}
 
 	ENDCG

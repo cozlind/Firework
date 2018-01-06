@@ -302,7 +302,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   solver: {fileID: 1439388769}
   RenderParticleMat: {fileID: 2100000, guid: 20456b02df5f32a40b948768b938f0f4, type: 2}
-  WaterColor: {r: 0, g: 0.46206903, b: 1, a: 1}
+  color1: {r: 1, g: 0, b: 0, a: 1}
+  color2: {r: 1, g: 0.51724136, b: 0, a: 1}
+  color3: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &1439388769
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -320,6 +322,7 @@ MonoBehaviour:
   pressureStiffness: 0.57
   restDensity: 4
   particleMass: 0.08
+  particleDist: 170.9976
   viscosity: 3
   maxAllowableTimestep: 0.004166667
   wallStiffness: 3000
@@ -327,8 +330,20 @@ MonoBehaviour:
   gravity: {x: 0, y: -10, z: 0}
   range: {x: 5, y: 5, z: 5}
   simulate: 1
+  isFirework: 1
+  fuelConsumeFactor: 5
+  reactSpeed: 0.01
+  temperatureProduce: 5
+  ambientTemperature: 300
+  emissivity: 0.5
+  stefanConst: -7.56e-16
+  copperDiffusivity: 0.0001
+  fuelDiffuse: 0.001
+  starRadius: 0.5
+  burnSpeed: 0.004
+  buoyancyCoef: 3
   ballRadius: 5
-  MouseInteractionRadius: 1
+  MouseInteractionRadius: 1.3
 --- !u!4 &1439388770
 Transform:
   m_ObjectHideFlags: 0
