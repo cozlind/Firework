@@ -368,13 +368,13 @@ void IntegrateCS(uint3 DTid : SV_DispatchThreadID) {
 	// 衝突判定を書くならここ -----
 
 	// 壁境界(ペナルティ法)
-	float dist = position.x;
+	float dist = position.x+ _Range.x;
 	acceleration += min(dist, 0) * -_WallStiffness * float3(1, 0, 0);
 
-	dist = position.y;
+	dist = position.y+ _Range.y;
 	acceleration += min(dist, 0) * -_WallStiffness * float3(0, 1, 0);
 
-	dist = position.z;
+	dist = position.z+ _Range.z;
 	acceleration += min(dist, 0) * -_WallStiffness * float3(0, 0, 1);
 
 	dist = _Range.x - position.x;

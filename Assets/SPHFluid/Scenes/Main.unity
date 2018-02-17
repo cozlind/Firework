@@ -88,6 +88,7 @@ LightmapSettings:
     m_PVRFilteringAtrousPositionSigmaDirect: 0.5
     m_PVRFilteringAtrousPositionSigmaIndirect: 2
     m_PVRFilteringAtrousPositionSigmaAO: 1
+    m_ShowResolutionOverlay: 1
   m_LightingDataAsset: {fileID: 0}
   m_UseShadowmask: 1
 --- !u!196 &4
@@ -173,9 +174,9 @@ MeshCollider:
   m_Material: {fileID: 0}
   m_IsTrigger: 0
   m_Enabled: 1
-  serializedVersion: 2
+  serializedVersion: 3
   m_Convex: 0
-  m_InflateMesh: 0
+  m_CookingOptions: 14
   m_SkinWidth: 0.01
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!33 &43916420
@@ -192,7 +193,7 @@ Transform:
   m_PrefabInternal: {fileID: 0}
   m_GameObject: {fileID: 43916417}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.73411655, y: -0.15682793, z: 0.26748657}
+  m_LocalPosition: {x: 0.73411655, y: -6.68, z: 0.26748657}
   m_LocalScale: {x: 2.6831088, y: 2.6831076, z: 2.6831076}
   m_Children: []
   m_Father: {fileID: 0}
@@ -246,6 +247,7 @@ Camera:
   m_TargetEye: 3
   m_HDR: 1
   m_AllowMSAA: 1
+  m_AllowDynamicResolution: 0
   m_ForceIntoRT: 0
   m_OcclusionCulling: 1
   m_StereoConvergence: 10
@@ -330,7 +332,7 @@ MonoBehaviour:
   gravity: {x: 0, y: -10, z: 0}
   range: {x: 5, y: 5, z: 5}
   simulate: 1
-  isFirework: 1
+  isFirework: 0
   fuelConsumeFactor: 5
   reactSpeed: 0.01
   temperatureProduce: 5

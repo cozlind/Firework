@@ -22,7 +22,7 @@ namespace Kodai.Fluid.SPH {
         protected override void InitParticleData(ref FluidParticle[] particles) {
             for (int i = 0; i < NumParticles; i++) {
                 particles[i].Velocity = Vector3.zero;
-                particles[i].Position = range / 2f + Random.insideUnitSphere * ballRadius;  // 円形に粒子を初期化する
+                particles[i].Position =  Random.insideUnitSphere * ballRadius;  // 円形に粒子を初期化する
             }
         }
 
@@ -52,5 +52,9 @@ namespace Kodai.Fluid.SPH {
             cs.SetBool("_MouseDown", isMouseDown);
         }
 
+        private void OnDrawGizmos () {
+            Gizmos.color = Color.white;
+            Gizmos.DrawWireCube (Vector3.zero, range*2);
+        }
     }
 }
