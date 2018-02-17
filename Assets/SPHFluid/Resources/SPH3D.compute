@@ -213,8 +213,8 @@ void ForceCS(uint3 DTid : SV_DispatchThreadID) {
 	const float h_sq = _Smoothlen * _Smoothlen;
 
 	// 近傍探索(O(n^2))
-	float3 press = float3(0, 0, 0);
-	float3 visco = float3(0, 0, 0);
+	float3 press = float3(0, 0,0);
+	float3 visco = float3(0, 0,0);
 	for (uint N_ID = 0; N_ID < _NumParticles; N_ID++) {
 		if (N_ID == P_ID) continue;	// 自身を対象とした場合スキップ
 
@@ -224,7 +224,7 @@ void ForceCS(uint3 DTid : SV_DispatchThreadID) {
 		float r_sq = dot(diff, diff);
 
 		// 半径内に収まっていない粒子は除外
-		if (r_sq < h_sq) {
+		if (r_sq < h_sq) {	
 			float  N_density = _ParticlesDensityBufferRead[N_ID].density;
 			float  N_pressure = _ParticlesPressureBufferRead[N_ID].pressure;
 			float3 N_velocity = _ParticlesBufferRead[N_ID].velocity;
@@ -330,12 +330,12 @@ void TypeCS(uint3 DTid : SV_DispatchThreadID) {
 		//温度を更新 (炎粒子の場合のみ)
 		P_temperature += P_thermalDiffuse + er;
 	}
-	if (_StarRadius*_StarRadius < dot(P_initPos, P_initPos) && P_type == 1) {
+	if (_StarRadius*_StarRadius < dot(P_initPos,P_initPos) && P_type == 1 ){
 		P_type = 0;
 		P_temperature = 2000.0f;
 		P_fuel = 100.0f;
 	}
-	if ((_StarRadius - _ParticleDist)*(_StarRadius - _ParticleDist) < dot(P_initPos, P_initPos) && P_type == 2) {
+	if ((_StarRadius- _ParticleDist)*(_StarRadius- _ParticleDist) < dot(P_initPos,P_initPos) && P_type == 2){
 		P_type = 1;
 		P_temperature = 2000.0f;
 		P_fuel = 100.0f;
@@ -361,10 +361,10 @@ void IntegrateCS(uint3 DTid : SV_DispatchThreadID) {
 	// マウスインタラクション
 	if (distance(position, _MousePos.xyz) < _MouseRadius && _MouseDown) {
 		float3 dir = position - _MousePos.xyz;
-		float pushBack = _MouseRadius - length(dir);
+		float pushBack = _MouseRadius-length(dir);
 		acceleration += 100 * pushBack * normalize(dir);
 	}
-
+    
 	// 衝突判定を書くならここ -----
 
 	// 壁境界(ペナルティ法)
@@ -393,7 +393,7 @@ void IntegrateCS(uint3 DTid : SV_DispatchThreadID) {
 	}
 	// 重力の加算
 	acceleration += _Gravity;
-
+	
 
 	// 前進オイラー法で次の粒子位置を更新
 	velocity += _TimeStep * acceleration;
